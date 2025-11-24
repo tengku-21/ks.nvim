@@ -98,6 +98,11 @@ vim.g.have_nerd_font = false
 -- NOTE: You can change these options as you wish!
 --  For more options, you can see `:help option-list`
 
+-- fold method
+vim.o.foldmethod = 'expr'
+vim.o.foldexpr = 'nvim_treesitter#foldexpr()'
+vim.o.foldlevel = 99
+
 -- Make line numbers default
 vim.o.number = true
 -- You can also add relative line numbers, to help with jumping.
@@ -117,6 +122,21 @@ vim.o.showmode = false
 vim.schedule(function()
   vim.o.clipboard = 'unnamedplus'
 end)
+
+--tengku set
+
+vim.opt.number = true
+vim.opt.cursorline = true
+vim.opt.relativenumber = true
+
+vim.opt.tabstop = 2
+vim.opt.shiftwidth = 2
+vim.opt.expandtab = true
+vim.opt.softtabstop = 2
+
+vim.opt.clipboard = 'unnamed'
+
+vim.opt.showtabline = 2
 
 -- Enable break indent
 vim.o.breakindent = true
@@ -377,6 +397,7 @@ require('lazy').setup({
         end,
       },
       { 'nvim-telescope/telescope-ui-select.nvim' },
+      { 'nvim-telescope/telescope-file-browser.nvim' },
 
       -- Useful for getting pretty icons, but requires a Nerd Font.
       { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
@@ -401,6 +422,16 @@ require('lazy').setup({
       -- Telescope picker. This is really useful to discover what Telescope can
       -- do as well as how to actually do it!
 
+      -- Enable Telescope extensions if they are installed
+      pcall(require('telescope').load_extension, 'fzf')
+      pcall(require('telescope').load_extension, 'ui-select')
+
+      -- See `:help telescope.builtin`
+      local builtin = require 'telescope.builtin'
+      local telescope = require 'telescope'
+      local fb_actions = require 'telescope._extensions.file_browser.actions'
+      local actions_state = require 'telescope.actions.state'
+
       -- [[ Configure Telescope ]]
       -- See `:help telescope` and `:help telescope.setup()`
       require('telescope').setup {
@@ -417,15 +448,64 @@ require('lazy').setup({
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
           },
+          file_browser = {
+            mappings = {
+              ['i'] = {
+                ['<C-w>'] = function(prompt_bufnr)
+                  local entry = actions_state.get_selected_entry()
+                  if entry and entry.path then
+                    local target_dir = vim.fn.isdirectory(entry.path) == 1 and entry.path or vim.fn.fnamemodify(entry.path, ':h')
+                    fb_actions.change_cwd(prompt_bufnr)
+                    vim.cmd('cd ' .. target_dir)
+                    print('Working directory set to: ' .. target_dir)
+                  end
+                end,
+              },
+
+              ['n'] = {
+                ['<C-w>'] = function(prompt_bufnr)
+                  local entry = actions_state.get_selected_entry()
+                  if entry and entry.path then
+                    local target_dir = vim.fn.isdirectory(entry.path) == 1 and entry.path or vim.fn.fnamemodify(entry.path, ':h')
+                    fb_actions.change_cwd(prompt_bufnr)
+                    vim.cmd('cd ' .. target_dir)
+                    print('Working directory set to: ' .. target_dir)
+                  end
+                end,
+
+                -- Create folder on key "u"
+                ['u'] = function(prompt_bufnr)
+                  local entry = actions_state.get_selected_entry()
+                  if not entry or not entry.path then
+                    return
+                  end
+
+                  -- always get directory
+                  local base_dir = vim.fn.isdirectory(entry.path) == 1 and entry.path or vim.fn.fnamemodify(entry.path, ':h')
+
+                  print('DEBUG: base_dir is ' .. base_dir)
+                  -- ask for name
+                  local folder_name = vim.fn.input 'New folder name: '
+                  if folder_name == nil or folder_name == '' then
+                    return
+                  end
+
+                  local new_path = base_dir .. '/' .. folder_name
+
+                  -- create directory
+                  vim.fn.mkdir(new_path, 'p')
+                  print('Created folder: ' .. new_path)
+
+                  -- force refresh (no 'refresh' function exists)
+                  fb_actions.goto_parent_dir(prompt_bufnr)
+                  fb_actions.goto_cwd(prompt_bufnr)
+                end,
+              },
+            },
+          },
         },
       }
 
-      -- Enable Telescope extensions if they are installed
-      pcall(require('telescope').load_extension, 'fzf')
-      pcall(require('telescope').load_extension, 'ui-select')
-
-      -- See `:help telescope.builtin`
-      local builtin = require 'telescope.builtin'
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
       vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
       vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
@@ -459,6 +539,55 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sn', function()
         builtin.find_files { cwd = vim.fn.stdpath 'config' }
       end, { desc = '[S]earch [N]eovim files' })
+
+      --Tengku personnal quick line
+      --
+      pcall(require('telescope').load_extension, 'file_browser')
+      -- Keymaps
+      vim.keymap.set('n', '<leader>fe', function()
+        telescope.extensions.file_browser.file_browser {
+          path = '%:p:h',
+          hidden = true,
+          grouped = true,
+          theme = 'ivy',
+        }
+      end, { desc = '[F]ile [E]xplorer of current file dir' })
+
+      vim.keymap.set('n', '<leader>fr', function()
+        telescope.extensions.file_browser.file_browser {
+          path = vim.fn.getcwd(), -- use current working directory
+          hidden = true,
+          grouped = true,
+          theme = 'ivy',
+        }
+      end, { desc = '[F]ile explo[R]er Current PWD' })
+
+      vim.keymap.set('n', '<leader>fd', function()
+        require('telescope').extensions.file_browser.file_browser {
+          path = '~/',
+          hidden = true,
+          grouped = true,
+          theme = 'ivy',
+        }
+      end, { desc = '[F]ind [D]irectory in ~/' })
+
+      -- recursive find (search all files in cwd and subfolders)
+
+      vim.keymap.set('n', '<leader>ff', function()
+        require('telescope.builtin').find_files {
+          cwd = vim.fn.getcwd(),
+          follow = true,
+          find_command = {
+            'rg',
+            '--files',
+            '--hidden',
+            '--follow',
+            '--ignore',
+            '--glob',
+            '!.git',
+          },
+        }
+      end, { desc = '[F]ind [Files] inside current dir' })
     end,
   },
 
@@ -742,9 +871,10 @@ require('lazy').setup({
     cmd = { 'ConformInfo' },
     keys = {
       {
-        '<leader>f',
+        '<M-F>',
         function()
           require('conform').format { async = true, lsp_format = 'fallback' }
+          print 'Formatting File'
         end,
         mode = '',
         desc = '[F]ormat buffer',
@@ -835,8 +965,8 @@ require('lazy').setup({
         -- <c-k>: Toggle signature help
         --
         -- See :h blink-cmp-config-keymap for defining your own keymap
-        preset = 'default',
-
+        preset = 'default', -- or "none", doesn't matter
+        ['<A-l>'] = { 'accept', 'fallback' },
         -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
         --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
       },
@@ -890,11 +1020,31 @@ require('lazy').setup({
           comments = { italic = false }, -- Disable italics in comments
         },
       }
-
       -- Load the colorscheme here.
       -- Like many other themes, this one has different styles, and you could load
       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
       vim.cmd.colorscheme 'tokyonight-night'
+
+      -- Base UI
+      vim.api.nvim_set_hl(0, 'Normal', { bg = 'none' })
+      vim.api.nvim_set_hl(0, 'NormalFloat', { bg = '#0f1117', fg = '#ffffff' })
+      vim.api.nvim_set_hl(0, 'FloatBorder', { bg = '#0f1117', fg = '#ffffff' })
+
+      -- Syntax (VSCode-ish)
+      vim.api.nvim_set_hl(0, 'Keyword', { fg = '#C586C0' })
+      vim.api.nvim_set_hl(0, 'Comment', { fg = '#608B4E', italic = true })
+      vim.api.nvim_set_hl(0, 'String', { fg = '#CE9178' })
+      vim.api.nvim_set_hl(0, 'Function', { fg = '#DCDCAA' })
+
+      -- Treesitter groups (TS colors)
+      vim.api.nvim_set_hl(0, '@variable', { fg = '#9CDCFE' }) -- normal variable
+      vim.api.nvim_set_hl(0, '@variable.builtin', { fg = '#4EC9B0' }) -- built-in
+      vim.api.nvim_set_hl(0, '@variable.readonly', { fg = '#4FC1FF' })
+      vim.api.nvim_set_hl(0, '@type.builtin', { fg = '#4EC9B0' })
+
+      vim.api.nvim_set_hl(0, '@tag', { fg = '#569CD6' }) -- JSX/TSX tags
+      vim.api.nvim_set_hl(0, '@keyword.import', { fg = '#C586C0' })
+      vim.api.nvim_set_hl(0, '@keyword.export', { fg = '#C586C0' })
     end,
   },
 
@@ -911,13 +1061,14 @@ require('lazy').setup({
       --  - yinq - [Y]ank [I]nside [N]ext [Q]uote
       --  - ci'  - [C]hange [I]nside [']quote
       require('mini.ai').setup { n_lines = 500 }
-
       -- Add/delete/replace surroundings (brackets, quotes, etc.)
       --
       -- - saiw) - [S]urround [A]dd [I]nner [W]ord [)]Paren
       -- - sd'   - [S]urround [D]elete [']quotes
       -- - sr)'  - [S]urround [R]eplace [)] [']
       require('mini.surround').setup()
+
+      require('mini.tabline').setup()
 
       -- Simple and easy statusline.
       --  You could remove this setup call if you don't like it,
@@ -944,7 +1095,23 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = {
+        'bash',
+        'c',
+        'diff',
+        'html',
+        'lua',
+        'luadoc',
+        'markdown',
+        'markdown_inline',
+        'query',
+        'vim',
+        'vimdoc',
+        'xml',
+        'javascript', -- JS for JSX
+        'typescript', -- TS for TSX
+        'tsx', -- TSX/JSX parser for React files
+      },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -954,6 +1121,7 @@ require('lazy').setup({
         --  the list of additional_vim_regex_highlighting and disabled languages for indent.
         additional_vim_regex_highlighting = { 'ruby' },
       },
+      fold = { enabled = true },
       indent = { enable = true, disable = { 'ruby' } },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
@@ -974,9 +1142,9 @@ require('lazy').setup({
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
   -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
@@ -984,7 +1152,7 @@ require('lazy').setup({
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
